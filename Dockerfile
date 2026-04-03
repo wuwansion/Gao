@@ -2,10 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Thêm git vào danh sách cài đặt ở đây
+# Cài đặt các công cụ cần thiết
 RUN apk add --no-cache python3 make g++ git
 
-# Bây giờ npm sẽ tìm thấy git và cài đặt được
+# Ép npm dùng HTTPS thay vì SSH để không bị hỏi mật khẩu hay chìa khóa
+RUN git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+
+# Cài đặt openclaw
 RUN npm install -g https://github.com/vual/OpenClaw.git
 
 # Phơi port
