@@ -2,17 +2,16 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Cài đặt các công cụ cần thiết
-RUN apk add --no-cache python3 make g++ git
+# Cài đặt các công cụ để giải nén và build
+RUN apk add --no-cache python3 make g++ curl
 
-# Ép npm dùng HTTPS thay vì SSH để không bị hỏi mật khẩu hay chìa khóa
-RUN git config --global url."https://github.com/".insteadOf ssh://git@github.com/
+# Tải bản nén của OpenClaw về, giải nén và cài đặt trực tiếp
+RUN curl -L https://github.com/vual/OpenClaw/archive/refs/heads/main.tar.gz | tar -xz --strip-components=1 && \
+    npm install && \
+    npm link
 
-# Cài đặt openclaw
-RUN npm install -g https://github.com/vual/OpenClaw.git
-
-# Phơi port
+# Phơi port cho Render
 EXPOSE 3000
 
 # Lệnh khởi chạy
-CMD ["openclaw", "start", "--host", "0.0.0.0", "--port", "3000"]
+CMD ["npm", "start", "--", "--host", "0.0.0.0", "--port", "3000"]
