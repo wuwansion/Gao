@@ -1,16 +1,11 @@
 FROM node:20-alpine
 
+# Không cần cài gì cả, để npx tự tải khi chạy
 WORKDIR /app
 
-# Cài đặt công cụ build cần thiết
-RUN apk add --no-cache python3 make g++
-
-# Cài đặt openclaw trực tiếp từ NPM (không dùng git clone để tránh hỏi mật khẩu)
-RUN npm install openclaw
-
-# Phơi port
+# Phơi port 3000 cho Render
 EXPOSE 3000
 
-# Khởi chạy bằng cách trỏ thẳng vào file khởi động của openclaw
-# Cách này giúp Render tìm thấy ứng dụng ngay lập tức
-CMD ["./node_modules/.bin/openclaw", "start", "--host", "0.0.0.0", "--port", "3000"]
+# Dùng npx để tải và chạy openclaw ngay lập tức
+# Lệnh này sẽ tự tìm đúng file thực thi trong hệ thống
+CMD ["npx", "-y", "openclaw", "start", "--host", "0.0.0.0", "--port", "3000"]
