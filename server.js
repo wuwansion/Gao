@@ -6,23 +6,48 @@ app.use(express.json());
 
 // ===== ENV =====
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8708556891:AAGnpgpnfj2W1sACWpHM78HSHN3xf2sp5hA";
+const TELEGRAM_TOKEN =
+  process.env.8708556891:AAGnpgpnfj2W1sACWpHM78HSHN3xf2sp5hA ||
+  "8708556891:AAGnpgpnfj2W1sACWpHM78HSHN3xf2sp5hA";
 
-// ===== DEBUG LOG =====
 console.log("===== SERVER START =====");
 console.log("KEY PREFIX:", GEMINI_KEY?.slice(0, 10));
 console.log("KEY LENGTH:", GEMINI_KEY?.length);
-console.log("PORT:", process.env.PORT || 3000);
 
 // ===== GEMINI =====
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+
+// ===== PROMPT FUNCTION =====
+function buildSalesPrompt(userMessage) {
+  return `
+Bạn là trợ lý AI bán hàng cho shop online.
+Phong cách trả lời:
+- tiếng Việt tự nhiên
+- thân thiện, lịch sự
+- ngắn gọn, dễ hiểu
+- ưu tiên chốt đơn
+
+Shop hiện đang bán:
+- máy xay mini
+- quạt mini cầm tay
+- đèn ngủ cảm ứng
+- phụ kiện gia dụng nhỏ
+
+Luôn trả lời theo hướng:
+1. giải đáp thắc mắc
+2. nêu lợi ích sản phẩm
+3. gợi ý mua hàng
+
+Tin nhắn khách: ${userMessage}
+`;
+}
 
 // ===== WEB UI =====
 app.get("/", (req, res) => {
   res.send(`
     <html>
       <body style="font-family: Arial; max-width: 700px; margin: 40px auto;">
-        <h2>🤖 OpenClaw AI Web Test</h2>
+        <h2>🤖 OpenClaw AI Bán Hàng</h2>
         <input id="msg" style="width:80%;padding:10px" placeholder="Nhập tin nhắn..." />
         <button onclick="sendMsg()">Gửi</button>
         <pre id="reply" style="margin-top:20px; white-space:pre-wrap;"></pre>
@@ -37,7 +62,7 @@ app.get("/", (req, res) => {
             });
             const data = await res.json();
             document.getElementById("reply").innerText =
-              JSON.stringify(data, null, 2);
+              data.reply || data.error;
           }
         </script>
       </body>
@@ -45,16 +70,17 @@ app.get("/", (req, res) => {
   `);
 });
 
-// ===== WEB CHAT API =====
+// ===== WEB CHAT =====
 app.post("/chat", async (req, res) => {
   try {
-    const text = req.body.message || "Xin chào";
+    const userMessage = req.body.message || "Xin chào";
+    const prompt = buildSalesPrompt(userMessage);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash"
     });
 
-    const result = await model.generateContent(text);
+    const result = await model.generateContent(prompt);
     const reply = result.response.text();
 
     res.json({
@@ -77,13 +103,14 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
     if (!message) return res.sendStatus(200);
 
     const chatId = message.chat.id;
-    const text = message.text || "Xin chào";
+    const userMessage = message.text || "Xin chào";
+    const prompt = buildSalesPrompt(userMessage);
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash"
     });
 
-    const result = await model.generateContent(text);
+    const result = await model.generateContent(prompt);
     const reply = result.response.text();
 
     await fetch(
@@ -111,5 +138,5 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server live on port", PORT);
+  console.log("AI sales bot live on port", PORT);
 });
