@@ -51,7 +51,7 @@ app.post("/chat", async (req, res) => {
     const text = req.body.message || "Xin chào";
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash"
+      model: "gemini-2.5-flash"
     });
 
     const result = await model.generateContent(text);
@@ -80,7 +80,7 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
     const text = message.text || "Xin chào";
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash"
+      model: "gemini-2.5-flash"
     });
 
     const result = await model.generateContent(text);
