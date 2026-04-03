@@ -3,16 +3,14 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Cài đặt công cụ build cần thiết
-RUN apk add --no-cache python3 make g++ git
+RUN apk add --no-cache python3 make g++
 
-# Tải code trực tiếp từ GitHub để đảm bảo có đầy đủ file thực thi
-RUN git clone https://github.com/vual/OpenClaw.git .
-
-# Cài đặt các thư viện phụ thuộc
-RUN npm install
+# Cài đặt openclaw trực tiếp từ NPM (không dùng git clone để tránh hỏi mật khẩu)
+RUN npm install openclaw
 
 # Phơi port
 EXPOSE 3000
 
-# Khởi chạy bằng lệnh node trực tiếp vào file chính của OpenClaw
-CMD ["node", "index.js", "--host", "0.0.0.0", "--port", "3000"]
+# Khởi chạy bằng cách trỏ thẳng vào file khởi động của openclaw
+# Cách này giúp Render tìm thấy ứng dụng ngay lập tức
+CMD ["./node_modules/.bin/openclaw", "start", "--host", "0.0.0.0", "--port", "3000"]
