@@ -5,6 +5,7 @@ const app = express();
 app.use(express.json());
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
+console.log("KEY PREFIX:", GEMINI_KEY?.slice(0, 10));
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
 app.get("/", (req, res) => {
