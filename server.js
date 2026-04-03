@@ -6,40 +6,68 @@ app.use(express.json());
 
 // ===== ENV =====
 const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const TELEGRAM_TOKEN =
-  process.env.8708556891:AAGnpgpnfj2W1sACWpHM78HSHN3xf2sp5hA ||
-  "8708556891:AAGnpgpnfj2W1sACWpHM78HSHN3xf2sp5hA";
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
 console.log("===== SERVER START =====");
-console.log("KEY PREFIX:", GEMINI_KEY?.slice(0, 10));
-console.log("KEY LENGTH:", GEMINI_KEY?.length);
+console.log("KEY PREFIX:", GEMINI_KEY?.slice(0, 8));
+console.log("PORT:", process.env.PORT || 3000);
 
-// ===== GEMINI =====
 const genAI = new GoogleGenerativeAI(GEMINI_KEY);
 
-// ===== PROMPT FUNCTION =====
+// ===== PROMPT =====
 function buildSalesPrompt(userMessage) {
   return `
 Bạn là trợ lý AI bán hàng cho shop online.
-Phong cách trả lời:
-- tiếng Việt tự nhiên
-- thân thiện, lịch sự
-- ngắn gọn, dễ hiểu
-- ưu tiên chốt đơn
+Trả lời bằng tiếng Việt tự nhiên, ngắn gọn, thân thiện.
+Ưu tiên tư vấn và chốt đơn lịch sự.
 
-Shop hiện đang bán:
-- máy xay mini
-- quạt mini cầm tay
-- đèn ngủ cảm ứng
-- phụ kiện gia dụng nhỏ
-
-Luôn trả lời theo hướng:
-1. giải đáp thắc mắc
-2. nêu lợi ích sản phẩm
-3. gợi ý mua hàng
-
-Tin nhắn khách: ${userMessage}
+Khách hỏi: ${userMessage}
 `;
+}
+
+// ===== DELAY =====
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ===== GEMINI CALL WITH RETRY + FALLBACK =====
+async function askAI(prompt) {
+  const models = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash-lite"
+  ];
+
+  let lastError = null;
+
+  for (const modelName of models) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName
+      });
+
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch (error) {
+      lastError = error;
+
+      const msg = String(error);
+
+      if (msg.includes("429")) {
+        console.log("429 detected, waiting 3 seconds...");
+        await sleep(3000);
+        continue;
+      }
+
+      if (msg.includes("404")) {
+        console.log("Model not found, trying fallback...");
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError;
 }
 
 // ===== WEB UI =====
@@ -47,7 +75,7 @@ app.get("/", (req, res) => {
   res.send(`
     <html>
       <body style="font-family: Arial; max-width: 700px; margin: 40px auto;">
-        <h2>🤖 OpenClaw AI Bán Hàng</h2>
+        <h2>🤖 OpenClaw AI Sales Bot</h2>
         <input id="msg" style="width:80%;padding:10px" placeholder="Nhập tin nhắn..." />
         <button onclick="sendMsg()">Gửi</button>
         <pre id="reply" style="margin-top:20px; white-space:pre-wrap;"></pre>
@@ -76,12 +104,7 @@ app.post("/chat", async (req, res) => {
     const userMessage = req.body.message || "Xin chào";
     const prompt = buildSalesPrompt(userMessage);
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash"
-    });
-
-    const result = await model.generateContent(prompt);
-    const reply = result.response.text();
+    const reply = await askAI(prompt);
 
     res.json({
       ok: true,
@@ -89,9 +112,10 @@ app.post("/chat", async (req, res) => {
     });
   } catch (error) {
     console.error("CHAT ERROR:", error);
+
     res.json({
       ok: false,
-      error: error.message
+      error: "AI đang bận, vui lòng thử lại sau 1 phút."
     });
   }
 });
@@ -104,14 +128,9 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
 
     const chatId = message.chat.id;
     const userMessage = message.text || "Xin chào";
+
     const prompt = buildSalesPrompt(userMessage);
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash"
-    });
-
-    const result = await model.generateContent(prompt);
-    const reply = result.response.text();
+    const reply = await askAI(prompt);
 
     await fetch(
       `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
@@ -134,9 +153,9 @@ app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
   }
 });
 
-// ===== START SERVER =====
+// ===== START =====
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("AI sales bot live on port", PORT);
+  console.log("Bot live on port", PORT);
 });
