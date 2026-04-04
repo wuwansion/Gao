@@ -1,0 +1,39 @@
+{
+  "provider": "openrouter",
+  "apiKey": "YOUR_OPENROUTER_KEY",
+  "model": "meta-llama/llama-3.3-70b-instruct:free",
+  "channels": {
+    "telegram": {
+      "token": "YOUR_TELEGRAM_BOT_TOKEN"
+    }
+  },
+  "options": {
+    "max_tokens": 512,
+    "temperature": 0.7
+  },
+  "salesCategories": {
+    "price": ["giá", "bao nhiêu", "cost", "price"],
+    "product": ["sản phẩm", "loại", "mẫu", "mua gì", "cái gì"],
+    "order": ["đặt hàng", "mua", "ship", "giao hàng", "order"]
+  },
+  "products": [
+    {
+      "name": "Máy xay mini",
+      "keywords": ["xay", "máy xay", "smoothie", "đồ uống"],
+      "shopee": "https://shopee.vn/may-xay-mini",
+      "tiktok": "https://www.tiktok.com/@shop/may-xay-mini"
+    },
+    {
+      "name": "Bình giữ nhiệt",
+      "keywords": ["bình", "giữ nhiệt", "nước nóng", "nước lạnh"],
+      "shopee": "https://shopee.vn/binh-giu-nhiet",
+      "tiktok": "https://www.tiktok.com/@shop/binh-giu-nhiet"
+    },
+    {
+      "name": "Tai nghe bluetooth",
+      "keywords": ["tai nghe", "bluetooth", "âm thanh", "headphone"],
+      "shopee": "https://shopee.vn/tai-nghe-bluetooth",
+      "tiktok": "https://www.tiktok.com/@shop/tai-nghe-bluetooth"
+    }
+  ]
+}
