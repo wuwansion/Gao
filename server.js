@@ -1,128 +1,80 @@
-const express = require("express");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const OpenClaw = require('openclaw');
+const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
 
-const app = express();
-app.use(express.json());
+// Load config
+const config = JSON.parse(fs.readFileSync('openclaw.json'));
 
-const GEMINI_KEY = process.env.GEMINI_API_KEY;
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+// Init OpenClaw
+const openclaw = new OpenClaw({
+  provider: config.provider,
+  apiKey: config.apiKey,
+  model: config.model,
+  options: config.options
+});
 
-// ===== PROMPT =====
-function buildSalesPrompt(userMessage) {
-  return `
-Bạn là trợ lý AI bán hàng cho shop online.
-Trả lời bằng tiếng Việt tự nhiên, ngắn gọn, thân thiện.
-Ưu tiên tư vấn và chốt đơn lịch sự.
+// Init Telegram polling
+const bot = new TelegramBot(config.channels.telegram.token, { polling: true });
 
-Khách hỏi: ${userMessage}
-`;
+console.log('🤖 Telegram AI Sales Bot Siêu Sales đang chạy...');
+
+// Hàm phân loại câu hỏi
+function detectCategory(text) {
+  text = text.toLowerCase();
+  for (const [category, keywords] of Object.entries(config.salesCategories)) {
+    if (keywords.some(k => text.includes(k))) return category;
+  }
+  return "general";
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+// Hàm gợi ý sản phẩm
+function suggestProduct(text) {
+  text = text.toLowerCase();
+  for (const p of config.products) {
+    if (p.keywords.some(k => text.includes(k))) return p;
+  }
+  return null;
 }
 
-// ===== AI WITH SAFE FALLBACK =====
-async function askAI(prompt) {
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash-lite"];
+// Bot reply
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
 
-  for (const modelName of models) {
-    try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
-    } catch (error) {
-      const msg = String(error);
+  console.log(`📩 Tin nhắn từ ${msg.from.username || msg.from.first_name}: ${text}`);
 
-      if (msg.includes("429")) {
-        await sleep(3000);
-        continue;
-      }
+  const category = detectCategory(text);
+  const product = suggestProduct(text);
 
-      if (msg.includes("404")) {
-        continue;
-      }
-    }
+  let prompt = `Khách hỏi: "${text}"\n`;
+
+  switch (category) {
+    case 'price':
+      prompt += "Trả lời khách hàng về giá cả, nhiệt tình, thân thiện.";
+      break;
+    case 'product':
+      prompt += "Trả lời khách hàng về sản phẩm, mô tả chi tiết, gợi ý lựa chọn.";
+      break;
+    case 'order':
+      prompt += "Hướng dẫn khách hàng cách đặt hàng, ship hàng, thanh toán, thân thiện.";
+      break;
+    default:
+      prompt += "Trả lời khách hàng thân thiện, hỗ trợ nhiệt tình.";
   }
 
-  // Fallback local reply when AI busy
-  return "Dạ shop đã nhận được tin nhắn 😊 Hiện AI đang bận trong giây lát, anh/chị vui lòng chờ 1 phút hoặc để lại nhu cầu để shop tư vấn ngay ạ.";
-}
+  if (product) {
+    prompt += `\nGợi ý sản phẩm: ${product.name}. Link Shopee: ${product.shopee}, Link TikTok Shop: ${product.tiktok}`;
+  }
 
-// ===== WEB UI =====
-app.get("/", (req, res) => {
-  res.send(`
-    <html>
-      <body style="font-family: Arial; max-width: 700px; margin: 40px auto;">
-        <h2>🤖 OpenClaw AI Sales Bot</h2>
-        <input id="msg" style="width:80%;padding:10px" placeholder="Nhập tin nhắn..." />
-        <button onclick="sendMsg()">Gửi</button>
-        <pre id="reply" style="margin-top:20px; white-space:pre-wrap;"></pre>
-
-        <script>
-          async function sendMsg() {
-            const message = document.getElementById("msg").value;
-            const res = await fetch("/chat", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message })
-            });
-            const data = await res.json();
-            document.getElementById("reply").innerText = data.reply;
-          }
-        </script>
-      </body>
-    </html>
-  `);
-});
-
-// ===== WEB CHAT =====
-app.post("/chat", async (req, res) => {
-  const userMessage = req.body.message || "Xin chào";
-  const prompt = buildSalesPrompt(userMessage);
-
-  const reply = await askAI(prompt);
-
-  res.json({
-    ok: true,
-    reply
-  });
-});
-
-// ===== TELEGRAM WEBHOOK =====
-app.post(`/webhook/${TELEGRAM_TOKEN}`, async (req, res) => {
   try {
-    const message = req.body.message;
-    if (!message) return res.sendStatus(200);
+    const aiResponse = await openclaw.generate({
+      prompt: prompt,
+      max_tokens: 512
+    });
 
-    const chatId = message.chat.id;
-    const userMessage = message.text || "Xin chào";
-
-    const prompt = buildSalesPrompt(userMessage);
-    const reply = await askAI(prompt);
-
-    await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text: reply
-        })
-      }
-    );
-
-    res.sendStatus(200);
-  } catch (error) {
-    console.error("WEBHOOK ERROR:", error);
-    res.sendStatus(200);
+    await bot.sendMessage(chatId, aiResponse.text);
+  } catch (err) {
+    console.error('❌ Lỗi khi gọi AI:', err);
+    await bot.sendMessage(chatId, 'Xin lỗi, shop đang bận, thử lại sau 1 phút nhé.');
   }
-});
-
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Bot live on port", PORT);
 });
