@@ -5,6 +5,18 @@ require("dotenv").config();
 
 const config = JSON.parse(fs.readFileSync("./openclaw.json", "utf8"));
 
+// Debug env
+console.log("TOKEN:", process.env.TELEGRAM_TOKEN ? "OK" : "MISSING");
+console.log("OPENROUTER:", process.env.OPENROUTER_KEY ? "OK" : "MISSING");
+
+if (!process.env.TELEGRAM_TOKEN) {
+  throw new Error("Thiếu TELEGRAM_TOKEN");
+}
+
+if (!process.env.OPENROUTER_KEY) {
+  throw new Error("Thiếu OPENROUTER_KEY");
+}
+
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
   polling: true
 });
@@ -38,15 +50,20 @@ async function askAI(userMessage, productInfo = "") {
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_KEY}`,
-          "Content-Type": "application/json"
+          Authorization: `Bearer ${process.env.OPENROUTER_KEY.trim()}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://render.com",
+          "X-Title": "salesbot"
         }
       }
     );
 
     return response.data.choices[0].message.content;
   } catch (error) {
-    console.error("Lỗi AI:", error.response?.data || error.message);
+    console.error("❌ AI ERROR:");
+    console.error(error.response?.status);
+    console.error(error.response?.data || error.message);
+
     return "Xin lỗi shop đang bận, vui lòng thử lại sau ❤️";
   }
 }
@@ -72,5 +89,5 @@ Link mua: ${product.link}
 
   const reply = await askAI(text, productInfo);
 
-  bot.sendMessage(chatId, reply);
+  await bot.sendMessage(chatId, reply);
 });
