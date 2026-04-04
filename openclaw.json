@@ -1,1 +1,19 @@
-
+{
+  "provider": "openrouter",
+  "model": "meta-llama/llama-3.3-70b-instruct:free",
+  "systemPrompt": "Bạn là AI sales bot của shop, trả lời thân thiện, tư vấn nhiệt tình, luôn cố gắng chốt đơn.",
+  "products": [
+    {
+      "name": "Máy xay mini",
+      "keywords": ["máy xay", "xay", "smoothie"],
+      "price": "199.000đ",
+      "link": "https://shopee.vn/may-xay-mini"
+    },
+    {
+      "name": "Bình giữ nhiệt",
+      "keywords": ["bình", "giữ nhiệt"],
+      "price": "149.000đ",
+      "link": "https://shopee.vn/binh-giu-nhiet"
+    }
+  ]
+}
