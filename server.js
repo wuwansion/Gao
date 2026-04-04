@@ -25,27 +25,21 @@ app.listen(PORT, () => {
   console.log(`🌐 Web server running on port ${PORT}`);
 });
 
-// xóa webhook cũ khi khởi động
+// xóa webhook cũ
 async function clearWebhook() {
   try {
     await axios.get(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/deleteWebhook`
+      `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/deleteWebhook?drop_pending_updates=true`
     );
     console.log("✅ Webhook cũ đã xóa");
   } catch (err) {
-    console.log("⚠️ Không xóa được webhook:", err.message);
+    console.log("⚠️ Lỗi xóa webhook:", err.message);
   }
 }
 
 // tạo bot
 const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
-  polling: {
-    interval: 1000,
-    autoStart: false,
-    params: {
-      timeout: 10
-    }
-  }
+  polling: false
 });
 
 // tìm sản phẩm
@@ -57,25 +51,27 @@ function findProduct(message) {
   );
 }
 
-// hỏi AI
+// gọi AI
 async function askAI(userMessage, productInfo = "") {
   try {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "google/gemma-2-9b-it:free",
+        model: "qwen/qwen3.6-plus:free",
         messages: [
           {
             role: "system",
             content:
               config.systemPrompt ||
-              "Bạn là AI sales bot thân thiện, trả lời ngắn gọn và tư vấn sản phẩm."
+              "Bạn là AI sales bot thân thiện, tư vấn nhiệt tình và chốt đơn."
           },
           {
             role: "user",
             content: `${userMessage}\n${productInfo}`
           }
-        ]
+        ],
+        max_tokens: 300,
+        temperature: 0.7
       },
       {
         headers: {
@@ -83,9 +79,12 @@ async function askAI(userMessage, productInfo = "") {
           "Content-Type": "application/json",
           "HTTP-Referer": "https://render.com",
           "X-Title": "salesbot"
-        }
+        },
+        timeout: 30000
       }
     );
+
+    console.log("✅ AI OK");
 
     return response.data.choices[0].message.content;
   } catch (error) {
@@ -127,9 +126,16 @@ Link mua: ${product.link}
   await bot.sendMessage(chatId, reply);
 });
 
-// khởi động an toàn
+// khởi động bot
 (async () => {
   await clearWebhook();
-  await bot.startPolling();
-  console.log("🤖 Bot Telegram đang chạy...");
+
+  setTimeout(async () => {
+    await bot.startPolling({
+      restart: true,
+      interval: 1000
+    });
+
+    console.log("🤖 Bot Telegram đang chạy...");
+  }, 3000);
 })();
