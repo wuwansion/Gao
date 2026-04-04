@@ -12,7 +12,7 @@ const config = JSON.parse(
   fs.readFileSync("./openclaw.json", "utf8")
 );
 
-// debug env
+// log env
 console.log("TOKEN:", process.env.TELEGRAM_TOKEN ? "OK" : "MISSING");
 console.log("OPENROUTER:", process.env.OPENROUTER_KEY ? "OK" : "MISSING");
 
@@ -44,10 +44,10 @@ const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
 
 // tìm sản phẩm
 function findProduct(message) {
-  const text = message.toLowerCase();
+  const text = (message || "").toLowerCase();
 
-  return config.products.find((p) =>
-    p.keywords.some((k) => text.includes(k))
+  return config.products?.find((p) =>
+    p.keywords?.some((k) => text.includes(k))
   );
 }
 
@@ -63,14 +63,14 @@ async function askAI(userMessage, productInfo = "") {
             role: "system",
             content:
               config.systemPrompt ||
-              "Bạn là AI sales bot thân thiện, tư vấn nhiệt tình và chốt đơn."
+              "Bạn là AI sales bot thân thiện, tư vấn và chốt đơn."
           },
           {
             role: "user",
             content: `${userMessage}\n${productInfo}`
           }
         ],
-        max_tokens: 300,
+        max_tokens: 200,
         temperature: 0.7
       },
       {
@@ -86,18 +86,22 @@ async function askAI(userMessage, productInfo = "") {
 
     console.log("✅ AI OK");
 
-    return response.data.choices[0].message.content;
-  } catch (error) {
-    console.log("========== AI ERROR ==========");
-    console.log("STATUS:", error.response?.status);
-    console.log(
-      "DATA:",
-      JSON.stringify(error.response?.data, null, 2)
+    return (
+      response.data?.choices?.[0]?.message?.content ||
+      "AI không trả lời"
     );
-    console.log("MESSAGE:", error.message);
+  } catch (error) {
+    const errMsg = JSON.stringify(
+      error.response?.data || error.message,
+      null,
+      2
+    );
+
+    console.log("========== AI ERROR ==========");
+    console.log(errMsg);
     console.log("==============================");
 
-    return "Xin lỗi shop đang bận ❤️";
+    return `⚠️ Lỗi AI:\n${errMsg}`;
   }
 }
 
@@ -130,12 +134,14 @@ Link mua: ${product.link}
 (async () => {
   await clearWebhook();
 
-  setTimeout(async () => {
+  try {
     await bot.startPolling({
       restart: true,
       interval: 1000
     });
 
     console.log("🤖 Bot Telegram đang chạy...");
-  }, 3000);
+  } catch (err) {
+    console.log("❌ Polling error:", err.message);
+  }
 })();
