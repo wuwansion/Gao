@@ -5,42 +5,21 @@ const express = require("express");
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+app.use(express.json());
 
-// đọc config
+const PORT = process.env.PORT || 10000;
+const BASE_URL = process.env.RENDER_EXTERNAL_URL || "https://salesbot-gd0s.onrender.com";
+const TOKEN = process.env.TELEGRAM_TOKEN;
+
 const config = JSON.parse(
   fs.readFileSync("./openclaw.json", "utf8")
 );
 
-// log env
-console.log("TOKEN:", process.env.TELEGRAM_TOKEN ? "OK" : "MISSING");
+console.log("TOKEN:", TOKEN ? "OK" : "MISSING");
 console.log("OPENROUTER:", process.env.OPENROUTER_KEY ? "OK" : "MISSING");
 
-// web server cho Render
-app.get("/", (req, res) => {
-  res.send("🤖 Sales Bot đang online");
-});
-
-app.listen(PORT, () => {
-  console.log(`🌐 Web server running on port ${PORT}`);
-});
-
-// xóa webhook cũ
-async function clearWebhook() {
-  try {
-    await axios.get(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/deleteWebhook?drop_pending_updates=true`
-    );
-    console.log("✅ Webhook cũ đã xóa");
-  } catch (err) {
-    console.log("⚠️ Lỗi xóa webhook:", err.message);
-  }
-}
-
-// tạo bot
-const bot = new TelegramBot(process.env.TELEGRAM_TOKEN, {
-  polling: false
-});
+// dùng webhook thay vì polling
+const bot = new TelegramBot(TOKEN);
 
 // tìm sản phẩm
 function findProduct(message) {
@@ -79,38 +58,36 @@ async function askAI(userMessage, productInfo = "") {
           "Content-Type": "application/json",
           "HTTP-Referer": "https://render.com",
           "X-Title": "salesbot"
-        },
-        timeout: 30000
+        }
       }
     );
-
-    console.log("✅ AI OK");
 
     return (
       response.data?.choices?.[0]?.message?.content ||
       "AI không trả lời"
     );
   } catch (error) {
-    const errMsg = JSON.stringify(
-      error.response?.data || error.message,
-      null,
-      2
-    );
-
-    console.log("========== AI ERROR ==========");
-    console.log(errMsg);
-    console.log("==============================");
-
-    return `⚠️ Lỗi AI:\n${errMsg}`;
+    return `⚠️ Lỗi AI:\n${JSON.stringify(
+      error.response?.data || error.message
+    )}`;
   }
 }
 
-// xử lý tin nhắn
-bot.on("message", async (msg) => {
+// route chính
+app.get("/", (req, res) => {
+  res.send("🤖 Bot đang online");
+});
+
+// webhook telegram
+app.post(`/bot${TOKEN}`, async (req, res) => {
+  const msg = req.body.message;
+
+  if (!msg) {
+    return res.sendStatus(200);
+  }
+
   const chatId = msg.chat.id;
   const text = msg.text || "";
-
-  console.log("📩", text);
 
   const product = findProduct(text);
 
@@ -118,30 +95,30 @@ bot.on("message", async (msg) => {
 
   if (product) {
     productInfo = `
-Sản phẩm phù hợp:
 Tên: ${product.name}
 Giá: ${product.price}
-Link mua: ${product.link}
+Link: ${product.link}
 `;
   }
 
   const reply = await askAI(text, productInfo);
 
   await bot.sendMessage(chatId, reply);
+
+  res.sendStatus(200);
 });
 
-// khởi động bot
-(async () => {
-  await clearWebhook();
+// start server + set webhook
+app.listen(PORT, async () => {
+  console.log(`🌐 Server chạy cổng ${PORT}`);
 
   try {
-    await bot.startPolling({
-      restart: true,
-      interval: 1000
-    });
+    await axios.get(
+      `https://api.telegram.org/bot${TOKEN}/setWebhook?url=${BASE_URL}/bot${TOKEN}`
+    );
 
-    console.log("🤖 Bot Telegram đang chạy...");
+    console.log("✅ Webhook đã cài");
   } catch (err) {
-    console.log("❌ Polling error:", err.message);
+    console.log("❌ Webhook lỗi:", err.message);
   }
-})();
+});
